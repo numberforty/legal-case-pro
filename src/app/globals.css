@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Add shimmer animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(12deg);
+  }
+  100% {
+    transform: translateX(200vw) skewX(12deg);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
+}
+
+/* Custom checkbox styles */
+input[type="checkbox"]:checked {
+  background-color: rgb(168 85 247);
+  border-color: rgb(168 85 247);
+}

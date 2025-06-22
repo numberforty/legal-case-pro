@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole    @default(ATTORNEY)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  assignedCases Case[]
+  tasks         Task[]
+  timeEntries   TimeEntry[]
+
+  @@map("users")
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  phone          String?
+  whatsappNumber String?      // Added for WhatsApp integration
+  whatsappOptIn  Boolean      @default(false) // Added for WhatsApp integration
+  company        String?
+  address        String?
+  type           ClientType
+  status         ClientStatus @default(ACTIVE)
+  priority       Priority     @default(MEDIUM)
+  notes          String?
+  joinDate       DateTime     @default(now())
+  lastContact    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  cases          Case[]
+  whatsappMessages WhatsAppMessage[] // Added relation to WhatsApp messages
+
+  @@map("clients")
+}
+
+model Case {
+  id             String      @id @default(cuid())
+  title          String
+  caseNumber     String      @unique
+  description    String?
+  type           CaseType
+  status         CaseStatus  @default(ACTIVE)
+  priority       Priority    @default(MEDIUM)
+  estimatedValue Float?
+  progress       Int         @default(0)
+  deadline       DateTime?
+  courtDate      DateTime?
+  opposing       String?
+  nextAction     String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  clientId       String
+  assignedToId   String
+  assignedTo     User        @relation(fields: [assignedToId], references: [id])
+  client         Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  documents      Document[]
+  tasks          Task[]
+  timeEntries    TimeEntry[]
+  whatsappMessages WhatsAppMessage[] // Added relation to WhatsApp messages
+
+  @@map("cases")
+}
+
+model Document {
+  id           String           @id @default(cuid())
+  name         String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  filePath     String
+  category     DocumentCategory @default(GENERAL)
+  uploadedAt   DateTime         @default(now())
+  caseId       String
+  uploadedById String?
+  case         Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  description String
+  hours       Float
+  hourlyRate  Float?
+  isBillable  Boolean  @default(true)
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  caseId      String
+  userId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("time_entries")
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus @default(PENDING)
+  priority     Priority   @default(MEDIUM)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  caseId       String
+  assignedToId String
+  assignedTo   User       @relation(fields: [assignedToId], references: [id])
+  case         Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+// Add this new model for WhatsApp messages
+model WhatsAppMessage {
+  id          String                @id @default(cuid())
+  twilioSid   String?               @unique // For future Twilio integration
+  from        String                // WhatsApp number with @c.us suffix
+  to          String                // WhatsApp number with @c.us suffix
+  body        String?               // Message content
+  direction   WhatsAppDirection     // inbound or outbound
+  status      WhatsAppStatus        @default(SENT)
+  messageType WhatsAppMessageType   @default(TEXT)
+  mediaPath   String?               // Path to media file if any
+  mediaType   String?               // MIME type of media
+  timestamp   DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  
+  // Relations
+  clientId    String?
+  caseId      String?
+  client      Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case        Case?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@map("whatsapp_messages")
+  @@index([clientId, timestamp])
+  @@index([caseId, timestamp])
+  @@index([from, timestamp])
+}
+
+enum UserRole {
+  ADMIN
+  PARTNER
+  ATTORNEY
+  PARALEGAL
+  ASSISTANT
+}
+
+enum ClientType {
+  CORPORATE
+  FAMILY
+  CRIMINAL
+  CIVIL
+  IP
+  EMPLOYMENT
+  OTHER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum CaseType {
+  CORPORATE
+  FAMILY
+  CRIMINAL
+  CIVIL
+  IP
+  EMPLOYMENT
+  OTHER
+}
+
+enum CaseStatus {
+  ACTIVE
+  REVIEW
+  DISCOVERY
+  TRIAL
+  SETTLEMENT
+  CLOSED
+  ON_HOLD
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum DocumentCategory {
+  CONTRACT
+  MOTION
+  EVIDENCE
+  CORRESPONDENCE
+  COURT_FILING
+  RESEARCH
+  GENERAL
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Add these new enums
+enum WhatsAppDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum WhatsAppMessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  STICKER
+  LOCATION
+}
