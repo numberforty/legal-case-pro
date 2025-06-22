@@ -371,6 +371,85 @@ class WhatsAppWebService {
     })).reverse();
   }
 
+  async getMessageAnalytics(params: {
+    clientId?: string;
+    caseId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    totalMessages: number;
+    inboundMessages: number;
+    outboundMessages: number;
+    responseRate: number;
+    averageResponseTime: number;
+    messagesByDay: Array<{ date: string; count: number }>;
+  }> {
+    const where: any = {};
+    if (params.clientId) where.clientId = params.clientId;
+    if (params.caseId) where.caseId = params.caseId;
+    if (params.startDate || params.endDate) {
+      where.timestamp = {};
+      if (params.startDate) where.timestamp.gte = params.startDate;
+      if (params.endDate) where.timestamp.lte = params.endDate;
+    }
+
+    const [totalMessages, inboundMessages, outboundMessages, messages] = await Promise.all([
+      prisma.whatsAppMessage.count({ where }),
+      prisma.whatsAppMessage.count({ where: { ...where, direction: 'INBOUND' } }),
+      prisma.whatsAppMessage.count({ where: { ...where, direction: 'OUTBOUND' } }),
+      prisma.whatsAppMessage.findMany({
+        where,
+        orderBy: { timestamp: 'asc' },
+        select: { direction: true, timestamp: true, from: true, to: true }
+      })
+    ]);
+
+    const messagesByDayMap: Record<string, number> = {};
+    const pending: Record<string, number[]> = {};
+    const responseTimes: number[] = [];
+
+    for (const msg of messages) {
+      const dateStr = msg.timestamp.toISOString().slice(0, 10);
+      messagesByDayMap[dateStr] = (messagesByDayMap[dateStr] || 0) + 1;
+
+      const contact = (msg.direction === 'INBOUND' ? msg.from : msg.to).replace('@c.us', '');
+      const time = msg.timestamp.getTime();
+
+      if (msg.direction === 'INBOUND') {
+        if (!pending[contact]) pending[contact] = [];
+        pending[contact].push(time);
+      } else {
+        const queue = pending[contact];
+        if (queue && queue.length > 0) {
+          const start = queue.shift();
+          if (start) {
+            responseTimes.push(time - start);
+          }
+        }
+      }
+    }
+
+    const messagesByDay = Object.entries(messagesByDayMap)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => (a.date > b.date ? 1 : -1));
+
+    const respondedCount = responseTimes.length;
+    const responseRate = inboundMessages ? respondedCount / inboundMessages : 0;
+    const averageResponseTime =
+      respondedCount > 0
+        ? responseTimes.reduce((sum, t) => sum + t, 0) / respondedCount
+        : 0;
+
+    return {
+      totalMessages,
+      inboundMessages,
+      outboundMessages,
+      responseRate,
+      averageResponseTime,
+      messagesByDay
+    };
+  }
+
   async restart(): Promise<void> {
     try {
       if (this.client) {
