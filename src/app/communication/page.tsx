@@ -345,7 +345,7 @@ export default function CommunicationPage() {
   const loadCommunicationData = async () => {
     try {
       setIsLoading(true);
-      
+
       if (selectedTab === 'internal') {
         setConversations(mockInternalConversations);
         if (mockInternalConversations.length > 0) {
@@ -353,12 +353,86 @@ export default function CommunicationPage() {
           setMessages(mockMessages[mockInternalConversations[0].id] || []);
         }
       } else {
-        // WhatsApp conversations - empty for now
-        setConversations([]);
-        setSelectedConversation(null);
-        setMessages([]);
+        const resp = await fetch('/api/whatsapp/messages?limit=50');
+        if (!resp.ok) throw new Error('Failed to load WhatsApp messages');
+        const data = await resp.json();
+
+        const convoMap = new Map<string, Conversation>();
+
+        (data.messages || []).forEach((msg: any) => {
+          const phoneRaw =
+            msg.direction === 'INBOUND' ? msg.from : msg.to;
+          const phone = phoneRaw.replace(/@c\.us$/, '').replace(/\D/g, '');
+
+          if (!convoMap.has(phone)) {
+            const contact: Contact = {
+              id: msg.client?.id || phone,
+              name: msg.client?.name || phone,
+              email: '',
+              role: 'Client',
+              status: 'online',
+              whatsappNumber: msg.client?.whatsappNumber || `+${phone}`
+            };
+
+            convoMap.set(phone, {
+              id: phone,
+              name: msg.client?.name || phone,
+              type: 'whatsapp',
+              participants: [contact],
+              unreadCount: 0,
+              platform: 'whatsapp'
+            });
+          }
+
+          const conv = convoMap.get(phone)!;
+          conv.lastMessage = {
+            id: msg.id,
+            senderId:
+              msg.direction === 'OUTBOUND' ? 'current-user' : conv.id,
+            content: msg.body || '',
+            timestamp: new Date(msg.timestamp).toISOString(),
+            type: msg.mediaPath ? 'file' : 'text',
+            status: (msg.status || 'SENT').toLowerCase(),
+            platform: 'whatsapp'
+          } as Message;
+        });
+
+        const convos = Array.from(convoMap.values()).sort((a, b) => {
+          const aTime = a.lastMessage
+            ? new Date(a.lastMessage.timestamp).getTime()
+            : 0;
+          const bTime = b.lastMessage
+            ? new Date(b.lastMessage.timestamp).getTime()
+            : 0;
+          return bTime - aTime;
+        });
+
+        setConversations(convos);
+        if (convos.length > 0) {
+          setSelectedConversation(convos[0].id);
+          const msgs = (data.messages || [])
+            .filter((m: any) => {
+              const p =
+                m.direction === 'INBOUND' ? m.from : m.to;
+              return p.replace(/@c\.us$/, '').replace(/\D/g, '') === convos[0].id;
+            })
+            .map((m: any) => ({
+              id: m.id,
+              senderId:
+                m.direction === 'OUTBOUND' ? 'current-user' : convos[0].id,
+              content: m.body || '',
+              timestamp: new Date(m.timestamp).toISOString(),
+              type: m.mediaPath ? 'file' : 'text',
+              status: (m.status || 'SENT').toLowerCase(),
+              platform: 'whatsapp'
+            })) as Message[];
+          setMessages(msgs);
+        } else {
+          setSelectedConversation(null);
+          setMessages([]);
+        }
       }
-      
+
       setIsLoading(false);
     } catch (err: any) {
       console.error('Failed to load communication data:', err);
@@ -369,6 +443,33 @@ export default function CommunicationPage() {
   useEffect(() => {
     loadCommunicationData();
   }, [selectedTab]);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (selectedTab !== 'whatsapp' || !selectedConversation) return;
+      try {
+        const resp = await fetch(
+          `/api/whatsapp/history?phoneNumber=${selectedConversation}&limit=50`
+        );
+        if (!resp.ok) throw new Error('Failed to load history');
+        const data = await resp.json();
+        const msgs: Message[] = (data.messages || []).map((m: any) => ({
+          id: m.id,
+          senderId:
+            m.direction === 'OUTBOUND' ? 'current-user' : selectedConversation,
+          content: m.body || '',
+          timestamp: new Date(m.timestamp).toISOString(),
+          type: m.mediaPath ? 'file' : 'text',
+          status: (m.status || 'SENT').toLowerCase(),
+          platform: 'whatsapp'
+        }));
+        setMessages(msgs);
+      } catch (err) {
+        console.error('Failed to load WhatsApp history:', err);
+      }
+    };
+    fetchHistory();
+  }, [selectedConversation, selectedTab]);
 
   // CHUNK 5: Handler Functions and Helper Functions
 // Copy this after the useEffect hooks
