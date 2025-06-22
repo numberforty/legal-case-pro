@@ -4,6 +4,7 @@ import { Client, LocalAuth, MessageMedia, Message } from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 import fs from 'fs-extra';
 import path from 'path';
+import { prisma } from '@/lib/prisma';
 
 export interface WhatsAppMessage {
   id: string;
@@ -192,7 +193,7 @@ class WhatsAppWebService {
   private async handleIncomingMessage(message: Message) {
     try {
       const phoneNumber = message.from.replace('@c.us', '').replace(/\D/g, '');
-      
+
       const messageData: WhatsAppMessage = {
         id: message.id._serialized,
         from: message.from,
@@ -203,6 +204,28 @@ class WhatsAppWebService {
         direction: 'INBOUND',
         status: 'READ' as const
       };
+
+      const exists = await prisma.whatsAppMessage.findUnique({
+        where: { id: messageData.id }
+      });
+      if (!exists) {
+        await prisma.whatsAppMessage.create({
+          data: {
+            id: messageData.id,
+            from: messageData.from,
+            to: messageData.to,
+            body: messageData.body || '',
+            direction: messageData.direction,
+            status: messageData.status,
+            messageType: messageData.type,
+            mediaPath: messageData.mediaPath,
+            mediaType: messageData.mediaType,
+            timestamp: new Date(messageData.timestamp),
+            clientId: messageData.clientId,
+            caseId: messageData.caseId
+          }
+        });
+      }
 
       console.log('Processing incoming message:', {
         from: phoneNumber,
@@ -243,6 +266,26 @@ class WhatsAppWebService {
         to: phoneNumber,
         messageId: sentMessage.id._serialized
       });
+
+      const outboundExists = await prisma.whatsAppMessage.findUnique({
+        where: { id: sentMessage.id._serialized }
+      });
+      if (!outboundExists) {
+        await prisma.whatsAppMessage.create({
+          data: {
+            id: sentMessage.id._serialized,
+            from: this.client.info.wid._serialized,
+            to: chatId,
+            body: message,
+            direction: 'OUTBOUND',
+            status: 'SENT',
+            messageType: 'TEXT',
+            timestamp: new Date(),
+            clientId: options?.clientId,
+            caseId: options?.caseId
+          }
+        });
+      }
 
       return {
         success: true,
@@ -297,6 +340,35 @@ class WhatsAppWebService {
         this.statusHandlers.splice(index, 1);
       }
     };
+  }
+
+  async getChatHistory(phoneNumber: string, limit = 50): Promise<WhatsAppMessage[]> {
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    const records = await prisma.whatsAppMessage.findMany({
+      where: {
+        OR: [
+          { from: { contains: cleaned } },
+          { to: { contains: cleaned } }
+        ]
+      },
+      orderBy: { timestamp: 'desc' },
+      take: limit
+    });
+
+    return records.map(msg => ({
+      id: msg.id,
+      from: msg.from,
+      to: msg.to,
+      body: msg.body || '',
+      timestamp: msg.timestamp.getTime(),
+      type: msg.messageType as WhatsAppMessage['type'],
+      direction: msg.direction as WhatsAppMessage['direction'],
+      status: msg.status as WhatsAppMessage['status'],
+      mediaPath: msg.mediaPath || undefined,
+      mediaType: msg.mediaType || undefined,
+      clientId: msg.clientId || undefined,
+      caseId: msg.caseId || undefined
+    })).reverse();
   }
 
   async restart(): Promise<void> {
