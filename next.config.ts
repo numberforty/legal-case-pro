@@ -1,16 +1,8 @@
 import type { NextConfig } from 'next';
-import webpack from 'webpack';
+// Turbopack doesn't support custom webpack configuration.
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['fluent-ffmpeg'],
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = Array.isArray(config.externals)
-        ? [...config.externals, 'fluent-ffmpeg']
-        : ['fluent-ffmpeg'];
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
