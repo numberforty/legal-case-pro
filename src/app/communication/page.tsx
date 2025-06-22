@@ -353,15 +353,45 @@ export default function CommunicationPage() {
           setMessages(mockMessages[mockInternalConversations[0].id] || []);
         }
       } else {
-        const resp = await fetch('/api/whatsapp/messages?limit=50');
-        if (!resp.ok) throw new Error('Failed to load WhatsApp messages');
-        const data = await resp.json();
+        const [clientsResp, messagesResp] = await Promise.all([
+          fetch('/api/whatsapp/clients'),
+          fetch('/api/whatsapp/messages?limit=50')
+        ]);
+
+        if (!clientsResp.ok) throw new Error('Failed to load WhatsApp clients');
+        if (!messagesResp.ok)
+          throw new Error('Failed to load WhatsApp messages');
+
+        const clientsData = await clientsResp.json();
+        const data = await messagesResp.json();
 
         const convoMap = new Map<string, Conversation>();
 
+        (clientsData.clients || []).forEach((client: any) => {
+          const phone = (client.whatsappNumber || '').replace(/\D/g, '');
+          if (!phone) return;
+
+          const contact: Contact = {
+            id: client.id,
+            name: client.name || phone,
+            email: '',
+            role: 'Client',
+            status: 'online',
+            whatsappNumber: client.whatsappNumber
+          };
+
+          convoMap.set(phone, {
+            id: phone,
+            name: client.name || phone,
+            type: 'whatsapp',
+            participants: [contact],
+            unreadCount: 0,
+            platform: 'whatsapp'
+          });
+        });
+
         (data.messages || []).forEach((msg: any) => {
-          const phoneRaw =
-            msg.direction === 'INBOUND' ? msg.from : msg.to;
+          const phoneRaw = msg.direction === 'INBOUND' ? msg.from : msg.to;
           const phone = phoneRaw.replace(/@c\.us$/, '').replace(/\D/g, '');
 
           if (!convoMap.has(phone)) {
@@ -387,8 +417,7 @@ export default function CommunicationPage() {
           const conv = convoMap.get(phone)!;
           conv.lastMessage = {
             id: msg.id,
-            senderId:
-              msg.direction === 'OUTBOUND' ? 'current-user' : conv.id,
+            senderId: msg.direction === 'OUTBOUND' ? 'current-user' : conv.id,
             content: msg.body || '',
             timestamp: new Date(msg.timestamp).toISOString(),
             type: msg.mediaPath ? 'file' : 'text',
