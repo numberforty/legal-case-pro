@@ -2,25 +2,33 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+Before running the application you need to set up your environment and database.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. **Create your local environment file**
 
-To keep the WhatsApp connection active during development, start the WhatsApp worker in a separate terminal:
+   ```bash
+   cp .env.example .env.local
+   ```
 
-```bash
-npm run whatsapp
-```
+2. **Run Prisma migrations**
 
-Run this command alongside `npm run dev` so the WhatsApp client stays connected.
+   ```bash
+   npx prisma migrate dev
+   ```
+
+3. **Start the development server**
+
+   ```bash
+   npm run dev
+   ```
+
+4. **Start the WhatsApp worker in another terminal**
+
+   ```bash
+   npm run whatsapp
+   ```
+
+Run the worker alongside `npm run dev` so the WhatsApp client stays connected.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
