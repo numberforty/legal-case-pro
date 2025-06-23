@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getWhatsAppService } from '@/lib/whatsapp-service';
 import { authenticateRequest } from '@/lib/edge-auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {

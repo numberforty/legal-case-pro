@@ -2,10 +2,8 @@
 // src/app/api/whatsapp/client-update/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { authenticateRequest } from '@/lib/edge-auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
