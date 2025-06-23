@@ -1,9 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getWhatsAppService } from '@/lib/whatsapp-service';
+import { authenticateRequest } from '@/lib/edge-auth';
 
 // GET handler for retrieving WhatsApp status
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const whatsappService = getWhatsAppService();
     const status = whatsappService.getStatus();
     return NextResponse.json(status);
@@ -17,8 +25,15 @@ export async function GET() {
 }
 
 // POST handler for initializing WhatsApp
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const whatsappService = getWhatsAppService();
     
     // Start initialization process without awaiting - critical fix for protocol error

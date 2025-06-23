@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getWhatsAppService } from '@/lib/whatsapp-service';
+import { authenticateRequest } from '@/lib/edge-auth';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const phoneNumber = searchParams.get('phoneNumber');
     const clientId = searchParams.get('clientId');
@@ -64,6 +72,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const messageData = await request.json();
     await prisma.whatsAppMessage.create({
       data: {

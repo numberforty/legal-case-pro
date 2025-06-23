@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { authenticateRequest } from '@/lib/edge-auth';
 
 const prisma = new PrismaClient();
 
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const { messageId, status } = await request.json();
     if (!messageId || !status) {
       return NextResponse.json({ error: 'Message ID and status are required' }, { status: 400 });

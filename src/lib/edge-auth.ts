@@ -1,6 +1,7 @@
 // lib/edge-auth.ts - Edge Runtime compatible JWT verification
 
 import { JWTPayload } from './auth';
+import type { NextRequest } from 'next/server';
 
 /**
  * Edge Runtime compatible JWT verification using Web Crypto API
@@ -72,4 +73,23 @@ export async function verifyJWTEdge(token: string): Promise<JWTPayload> {
     email: payload.email,
     role: payload.role
   };
+}
+
+/**
+ * Authenticate a request using the auth-token cookie and Edge JWT verification
+ */
+export async function authenticateRequest(
+  request: NextRequest
+): Promise<{ isAuthenticated: boolean; user?: JWTPayload }> {
+  try {
+    const token = request.cookies.get('auth-token')?.value;
+    if (!token) {
+      return { isAuthenticated: false };
+    }
+
+    const decoded = await verifyJWTEdge(token);
+    return { isAuthenticated: true, user: decoded };
+  } catch {
+    return { isAuthenticated: false };
+  }
 }

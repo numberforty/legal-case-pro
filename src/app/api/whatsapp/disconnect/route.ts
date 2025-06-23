@@ -1,9 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getWhatsAppService } from '@/lib/whatsapp-service';
+import { authenticateRequest } from '@/lib/edge-auth';
 
 // POST handler for disconnecting WhatsApp
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const authResult = await authenticateRequest(request);
+    if (!authResult.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     const whatsappService = getWhatsAppService();
     
     // Important fix: Use setTimeout to avoid waiting for complete disconnection
