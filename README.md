@@ -14,6 +14,14 @@ pnpm dev
 bun dev
 ```
 
+To keep the WhatsApp connection active during development, start the WhatsApp worker in a separate terminal:
+
+```bash
+npm run whatsapp
+```
+
+Run this command alongside `npm run dev` so the WhatsApp client stays connected.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
