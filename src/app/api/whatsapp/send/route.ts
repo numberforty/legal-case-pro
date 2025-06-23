@@ -3,6 +3,12 @@ import { getWhatsAppService } from '@/lib/whatsapp-service';
 import { authenticateRequest } from '@/lib/edge-auth';
 
 export async function POST(request: NextRequest) {
+  let body: {
+    phoneNumber?: string;
+    message?: string;
+    caseId?: string;
+    clientId?: string;
+  } | undefined;
   try {
     const authResult = await authenticateRequest(request);
     if (!authResult.isAuthenticated) {
@@ -11,7 +17,7 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    const body = await request.json();
+    body = await request.json();
     const { phoneNumber, message, caseId, clientId } = body;
 
     if (!phoneNumber || !message) {
@@ -30,7 +36,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('WhatsApp send error:', error);
-    const fallbackUrl = `https://wa.me/${body?.phoneNumber?.replace(/\D/g, '')}?text=${encodeURIComponent(body?.message || '')}`;
+    const fallbackUrl = body?.phoneNumber
+      ? `https://wa.me/${body.phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(body.message || '')}`
+      : undefined;
     
     return NextResponse.json(
       { 
