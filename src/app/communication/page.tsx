@@ -469,36 +469,45 @@ export default function CommunicationPage() {
     }
   };
 
+  const refreshMessages = useCallback(async () => {
+    if (selectedTab !== 'whatsapp') {
+      await loadCommunicationData();
+      return;
+    }
+
+    if (!selectedConversation) {
+      await loadCommunicationData();
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `/api/whatsapp/history?phoneNumber=${selectedConversation}&limit=50`
+      );
+      if (!resp.ok) throw new Error('Failed to load history');
+      const data = await resp.json();
+      const msgs: Message[] = (data.messages || []).map((m: any) => ({
+        id: m.id,
+        senderId: m.direction === 'OUTBOUND' ? 'current-user' : selectedConversation,
+        content: m.body || '',
+        timestamp: new Date(m.timestamp).toISOString(),
+        type: m.mediaPath ? 'file' : 'text',
+        status: (m.status || 'SENT').toLowerCase(),
+        platform: 'whatsapp'
+      }));
+      setMessages(msgs);
+    } catch (err) {
+      console.error('Failed to refresh WhatsApp history:', err);
+    }
+  }, [selectedConversation, selectedTab, loadCommunicationData]);
+
   useEffect(() => {
     loadCommunicationData();
   }, [selectedTab]);
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (selectedTab !== 'whatsapp' || !selectedConversation) return;
-      try {
-        const resp = await fetch(
-          `/api/whatsapp/history?phoneNumber=${selectedConversation}&limit=50`
-        );
-        if (!resp.ok) throw new Error('Failed to load history');
-        const data = await resp.json();
-        const msgs: Message[] = (data.messages || []).map((m: any) => ({
-          id: m.id,
-          senderId:
-            m.direction === 'OUTBOUND' ? 'current-user' : selectedConversation,
-          content: m.body || '',
-          timestamp: new Date(m.timestamp).toISOString(),
-          type: m.mediaPath ? 'file' : 'text',
-          status: (m.status || 'SENT').toLowerCase(),
-          platform: 'whatsapp'
-        }));
-        setMessages(msgs);
-      } catch (err) {
-        console.error('Failed to load WhatsApp history:', err);
-      }
-    };
-    fetchHistory();
-  }, [selectedConversation, selectedTab]);
+    refreshMessages();
+  }, [selectedConversation, selectedTab, refreshMessages]);
 
   // CHUNK 5: Handler Functions and Helper Functions
 // Copy this after the useEffect hooks
@@ -687,7 +696,11 @@ return (
                 
                 {whatsappStatus.isReady && (
                   <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.preventDefault(); checkWhatsAppStatus(0); }}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      e.preventDefault();
+                      refreshMessages();
+                      checkWhatsAppStatus(0);
+                    }}
                     className="text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
                   >
                     <RefreshCw className="h-4 w-4 mr-1" />
