@@ -49,6 +49,8 @@ async function main() {
       type: 'CORPORATE',
       priority: 'HIGH',
       notes: 'Premium corporate client. Prefers email communication.',
+      whatsappNumber: '+15551234567',
+      whatsappOptIn: true,
     },
   });
 
@@ -62,6 +64,8 @@ async function main() {
       type: 'CORPORATE',
       priority: 'MEDIUM',
       notes: 'Startup client, fast-growing company.',
+      whatsappNumber: '+15552345678',
+      whatsappOptIn: true,
     },
   });
 
@@ -74,6 +78,8 @@ async function main() {
       type: 'FAMILY',
       priority: 'HIGH',
       notes: 'Divorce proceedings. Sensitive case.',
+      whatsappNumber: '+15553456789',
+      whatsappOptIn: true,
     },
   });
 
@@ -179,6 +185,54 @@ async function main() {
       caseId: case2.id,
       assignedToId: attorney1.id,
     },
+  });
+
+  // Create initial WhatsApp conversations
+  const systemNumber = '15550000000@c.us';
+
+  await prisma.whatsAppMessage.createMany({
+    data: [
+      {
+        from: '15551234567@c.us',
+        to: systemNumber,
+        body: 'Hello, I would like to discuss the merger case.',
+        direction: 'INBOUND',
+        status: 'READ',
+        messageType: 'TEXT',
+        clientId: client1.id,
+        caseId: case1.id,
+      },
+      {
+        from: systemNumber,
+        to: '15551234567@c.us',
+        body: 'Sure Sarah, let me know a good time.',
+        direction: 'OUTBOUND',
+        status: 'SENT',
+        messageType: 'TEXT',
+        clientId: client1.id,
+        caseId: case1.id,
+      },
+      {
+        from: '15552345678@c.us',
+        to: systemNumber,
+        body: 'Any update on the patent filing?',
+        direction: 'INBOUND',
+        status: 'READ',
+        messageType: 'TEXT',
+        clientId: client2.id,
+        caseId: case3.id,
+      },
+      {
+        from: systemNumber,
+        to: '15552345678@c.us',
+        body: 'We are preparing the documents this week.',
+        direction: 'OUTBOUND',
+        status: 'SENT',
+        messageType: 'TEXT',
+        clientId: client2.id,
+        caseId: case3.id,
+      },
+    ],
   });
 
   console.log('✅ Database seeded successfully!');
