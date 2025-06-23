@@ -6,6 +6,14 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
+  // Clear existing data to allow seeding multiple times without errors
+  await prisma.whatsAppMessage.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.timeEntry.deleteMany();
+  await prisma.case.deleteMany();
+  await prisma.client.deleteMany();
+  await prisma.user.deleteMany();
+
   // Create admin user
   const adminUser = await prisma.user.create({
     data: {
