@@ -89,88 +89,9 @@ export default function CommunicationPage() {
       error: 'WhatsApp not connected'
     });
 
-    // CHUNK 3: Mock Data
-// Copy this after the state declarations
-
-  // Mock data
-  const mockContacts: Contact[] = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@email.com',
-      role: 'Client',
-      status: 'online',
-      whatsappNumber: '+1234567890'
-    },
-    {
-      id: '2',
-      name: 'Michael Chen',
-      email: 'michael.chen@personal.com',
-      role: 'Client',
-      status: 'offline',
-      whatsappNumber: '+1987654321'
-    }
-  ];
-
-  const mockInternalConversations: Conversation[] = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      type: 'direct',
-      participants: [mockContacts[0]],
-      lastMessage: {
-        id: 'm1',
-        senderId: '1',
-        content: 'Thank you for the update on my case. When can we schedule the next meeting?',
-        timestamp: '2024-06-21T14:30:00Z',
-        type: 'text',
-        status: 'read',
-        platform: 'internal'
-      },
-      unreadCount: 0,
-      platform: 'internal'
-    },
-    {
-      id: '2',
-      name: 'Case #LC-2024-001 Team',
-      type: 'case',
-      participants: [mockContacts[0]],
-      lastMessage: {
-        id: 'm2',
-        senderId: '3',
-        content: 'I have reviewed the documents. Everything looks good for filing.',
-        timestamp: '2024-06-21T13:15:00Z',
-        type: 'text',
-        status: 'delivered',
-        platform: 'internal'
-      },
-      unreadCount: 2,
-      platform: 'internal'
-    }
-  ];
-
-  const mockMessages: { [key: string]: Message[] } = {
-    '1': [
-      {
-        id: 'm1-1',
-        senderId: '1',
-        content: 'Hello, I wanted to check on the status of my contract review.',
-        timestamp: '2024-06-21T14:00:00Z',
-        type: 'text',
-        status: 'read',
-        platform: 'internal'
-      },
-      {
-        id: 'm1-2',
-        senderId: 'current-user',
-        content: 'Hi Sarah! I have completed the initial review and have some suggestions.',
-        timestamp: '2024-06-21T14:15:00Z',
-        type: 'text',
-        status: 'read',
-        platform: 'internal'
-      }
-    ]
-  };
+    // Contacts loaded from the API
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [selectedContactId, setSelectedContactId] = useState('');
 
   // CHUNK 4: Functions and useEffect hooks
 // Copy this after the mock data
@@ -347,11 +268,9 @@ export default function CommunicationPage() {
       setIsLoading(true);
 
       if (selectedTab === 'internal') {
-        setConversations(mockInternalConversations);
-        if (mockInternalConversations.length > 0) {
-          setSelectedConversation(mockInternalConversations[0].id);
-          setMessages(mockMessages[mockInternalConversations[0].id] || []);
-        }
+        setConversations([]);
+        setSelectedConversation(null);
+        setMessages([]);
       } else {
         const [clientsResp, messagesResp] = await Promise.all([
           fetch('/api/whatsapp/clients'),
@@ -364,6 +283,16 @@ export default function CommunicationPage() {
 
         const clientsData = await clientsResp.json();
         const data = await messagesResp.json();
+
+        const loadedContacts: Contact[] = (clientsData.clients || []).map((client: any) => ({
+          id: client.id,
+          name: client.name || (client.whatsappNumber || '').replace(/\D/g, ''),
+          email: '',
+          role: 'Client',
+          status: 'online',
+          whatsappNumber: client.whatsappNumber,
+        }));
+        setContacts(loadedContacts);
 
         const convoMap = new Map<string, Conversation>();
 
@@ -1003,11 +932,15 @@ className="text-white/60 hover:text-white transition-colors"
 <label className="block text-sm font-medium text-white/70 mb-2">
   Select Contact
 </label>
-<select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500">
+<select
+  value={selectedContactId}
+  onChange={(e) => setSelectedContactId(e.target.value)}
+  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500"
+>
   <option value="">Choose a contact...</option>
-  {mockContacts.map((contact) => (
+  {contacts.map((contact) => (
     <option key={contact.id} value={contact.id}>
-      {contact.name} ({contact.role})
+      {contact.name}
       {selectedTab === 'whatsapp' && contact.whatsappNumber && ` - ${contact.whatsappNumber}`}
     </option>
   ))}
@@ -1022,8 +955,48 @@ className="text-white/60 hover:text-white transition-colors"
   Cancel
 </button>
 <button
-  onClick={() => setShowNewChat(false)}
+  onClick={async () => {
+    const contact = contacts.find(c => c.id === selectedContactId);
+    if (!contact) return;
+    const phone = (contact.whatsappNumber || '').replace(/\D/g, '');
+    const convExists = conversations.some(c => c.id === phone);
+    if (!convExists) {
+      const newConv: Conversation = {
+        id: phone,
+        name: contact.name || phone,
+        type: 'whatsapp',
+        participants: [contact],
+        unreadCount: 0,
+        platform: 'whatsapp'
+      };
+      setConversations(prev => [newConv, ...prev]);
+    }
+    setSelectedConversation(phone);
+    setShowNewChat(false);
+    try {
+      const resp = await fetch(`/api/whatsapp/history?phoneNumber=${phone}&limit=50`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const msgs: Message[] = (data.messages || []).map((m: any) => ({
+          id: m.id,
+          senderId: m.direction === 'OUTBOUND' ? 'current-user' : phone,
+          content: m.body || '',
+          timestamp: new Date(m.timestamp).toISOString(),
+          type: m.mediaPath ? 'file' : 'text',
+          status: (m.status || 'SENT').toLowerCase(),
+          platform: 'whatsapp'
+        }));
+        setMessages(msgs);
+      } else {
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Failed to load history for new chat', err);
+      setMessages([]);
+    }
+  }}
   className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+  disabled={!selectedContactId}
 >
   Start Chat
 </button>
