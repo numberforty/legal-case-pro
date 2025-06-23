@@ -342,7 +342,7 @@ export default function CommunicationPage() {
     }
   }, [isAuthenticated, authLoading, router, checkWhatsAppStatus]);
 
-  const loadCommunicationData = async () => {
+  const loadCommunicationData = useCallback(async () => {
     try {
       setIsLoading(true);
 
@@ -467,7 +467,7 @@ export default function CommunicationPage() {
       console.error('Failed to load communication data:', err);
       setIsLoading(false);
     }
-  };
+  }, [selectedTab]);
 
   const refreshMessages = useCallback(async () => {
     if (selectedTab !== 'whatsapp') {
