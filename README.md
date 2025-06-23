@@ -28,6 +28,15 @@ Before running the application you need to set up your environment and database.
    npm run whatsapp
    ```
 
+   When the worker starts it prints a QR code in the terminal. A Chromium window
+   may also open to display the QR code when running in development mode.
+   Scan this code with the WhatsApp mobile app to link the session and keep the
+   worker running so messages continue syncing.
+
+   If you ever need to log in again, delete the `.wwebjs_auth` folder and restart
+   the worker to generate a new QR code. Set `NODE_ENV=production` if you prefer
+   the worker to run headless without opening a browser window.
+
 Run the worker alongside `npm run dev` so the WhatsApp client stays connected.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

@@ -2,6 +2,7 @@
 
 import { Client, LocalAuth, MessageMedia, Message } from 'whatsapp-web.js';
 import QRCode from 'qrcode';
+import qrcodeTerminal from 'qrcode-terminal';
 import fs from 'fs-extra';
 import path from 'path';
 import { prisma } from '@/lib/prisma';
@@ -95,6 +96,8 @@ class WhatsAppWebService {
     this.client.on('qr', async (qr) => {
       try {
         console.log('WhatsApp QR Code generated');
+        // Print an ASCII QR code in the terminal for convenience
+        qrcodeTerminal.generate(qr, { small: true });
         const qrCodeDataUrl = await QRCode.toDataURL(qr, {
           width: 256,
           margin: 2,
